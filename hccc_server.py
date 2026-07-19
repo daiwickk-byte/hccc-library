@@ -63,7 +63,16 @@ def get_sheets_service():
     from googleapiclient.discovery import build
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
-    # ── Service Account (Render / cloud) ──
+    # ── Service Account from environment variable (Railway/cloud) ──
+    sa_json = os.environ.get("SERVICE_ACCOUNT_JSON")
+    if sa_json:
+        import json as _json
+        from google.oauth2.service_account import Credentials
+        sa_info = _json.loads(sa_json)
+        creds = Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+        return build("sheets", "v4", credentials=creds)
+
+    # ── Service Account from file ──
     if os.path.exists(SERVICE_ACCOUNT_FILE):
         from google.oauth2.service_account import Credentials
         creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
