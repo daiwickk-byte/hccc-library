@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HCCC Library – Book Issuance</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 35%, #ffcd3c 65%, #c0392b 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.28);
+  width: 100%; max-width: 620px;
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #922b21, #c0392b, #e74c3c);
+  color: white; padding: 28px 32px 22px; text-align: center;
+  position: relative;
+}
+.header .om { font-size: 2.2rem; margin-bottom: 4px; }
+.header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.5px; }
+.header p { font-size: 0.82rem; opacity: 0.82; margin-top: 3px; }
+.report-toggle-btn {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4);
+  color: white; border-radius: 8px; padding: 6px 12px;
+  font-size: 0.78rem; cursor: pointer; font-weight: 600; transition: background 0.2s;
+}
+.report-toggle-btn:hover { background: rgba(255,255,255,0.3); }
+
+/* Progress */
+.progress-bar {
+  display: flex; background: #fdf3e7;
+  padding: 16px 32px; align-items: center;
+}
+.step-ind {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; position: relative;
+}
+.step-ind:not(:last-child)::after {
+  content: ''; position: absolute;
+  top: 15px; left: 58%; width: 84%; height: 3px;
+  background: #ddd; z-index: 0; transition: background 0.4s;
+}
+.step-ind.done:not(:last-child)::after { background: #e74c3c; }
+.step-circle {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #ddd; color: #999;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.82rem; z-index: 1; transition: all 0.3s;
+}
+.step-ind.active .step-circle { background: #e74c3c; color: white; box-shadow: 0 0 0 4px #fce4e4; }
+.step-ind.done .step-circle { background: #27ae60; color: white; }
+.step-label { font-size: 0.68rem; color: #aaa; margin-top: 4px; }
+.step-ind.active .step-label { color: #c0392b; font-weight: 700; }
+.step-ind.done .step-label { color: #27ae60; }
+
+/* Body */
+.form-body { padding: 28px 32px 32px; }
+
+.section-title {
+  font-size: 1.05rem; font-weight: 700; color: #c0392b;
+  margin-bottom: 20px; padding-bottom: 8px;
+  border-bottom: 2px solid #fce4e4;
+}
+
+.field { margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 0.78rem; font-weight: 700;
+  color: #666; margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.field input {
+  width: 100%; padding: 11px 14px;
+  border: 2px solid #ececec; border-radius: 10px;
+  font-size: 0.95rem; outline: none; color: #333; transition: border-color 0.2s;
+}
+.field input:focus { border-color: #e74c3c; }
+.hint { font-size: 0.74rem; color: #bbb; margin-top: 5px; }
+
+.row { display: flex; gap: 14px; }
+.row .field { flex: 1; }
+
+/* Buttons */
+.btn {
+  width: 100%; padding: 13px; border: none; border-radius: 10px;
+  font-size: 0.97rem; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; margin-top: 6px; letter-spacing: 0.3px;
+}
+.btn-primary { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(192,57,43,0.38); }
+.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+.btn-secondary { background: #f0f0f0; color: #666; }
+.btn-secondary:hover { background: #e5e5e5; }
+.btn-success { background: linear-gradient(135deg, #27ae60, #1e8449); color: white; }
+.btn-success:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(39,174,96,0.38); }
+.btn-success:disabled { background: #ccc; cursor: not-allowed; }
+
+/* Status box */
+.status-box {
+  border-radius: 12px; padding: 14px 16px; margin: 14px 0;
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 600; font-size: 0.9rem;
+}
+.status-box.registered { background: #eafaf1; border: 2px solid #27ae60; color: #1e8449; }
+.status-box.not-reg    { background: #fef9e7; border: 2px solid #f39c12; color: #b7770d; }
+.status-box.error      { background: #fdf2f2; border: 2px solid #e74c3c; color: #c0392b; }
+.status-box .icon { font-size: 1.4rem; flex-shrink: 0; }
+
+/* Agreement */
+.agreement-box {
+  background: #fffbf2; border: 2px solid #f7931e;
+  border-radius: 12px; padding: 16px; margin: 14px 0;
+  font-size: 0.84rem; color: #555; line-height: 1.65;
+}
+.agreement-box strong { color: #c0392b; }
+.agreement-box ul { margin: 8px 0 0 18px; }
+.agreement-box li { margin-bottom: 4px; }
+
+.checkbox-row {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 10px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: 18px; height: 18px; margin-top: 2px;
+  accent-color: #e74c3c; cursor: pointer; flex-shrink: 0;
+}
+.checkbox-row label { font-size: 0.84rem; color: #444; cursor: pointer; line-height: 1.5; }
+
+/* Return badge */
+.return-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: white; border-radius: 20px; padding: 6px 18px;
+  font-weight: 700; font-size: 0.85rem; margin-top: 10px;
+}
+
+/* Success */
+.success-screen { text-align: center; padding: 10px 0 16px; }
+.success-screen .check { font-size: 4rem; margin-bottom: 10px; }
+.success-screen h2 { color: #27ae60; font-size: 1.35rem; margin-bottom: 6px; }
+.success-screen p { color: #666; font-size: 0.88rem; line-height: 1.6; }
+
+.email-preview {
+  background: #f8f9fa; border: 1px solid #e0e0e0;
+  border-radius: 12px; padding: 16px; text-align: left;
+  margin: 16px 0; font-size: 0.82rem; color: #444; line-height: 1.75;
+}
+.email-label { font-size: 0.7rem; text-transform: uppercase; color: #aaa; font-weight: 700; margin-bottom: 8px; }
+
+/* ── Report Table ── */
+#reportView { padding: 24px 32px 32px; }
+.report-title {
+  font-size: 1.05rem; font-weight: 700; color: #c0392b;
+  margin-bottom: 16px; padding-bottom: 8px;
+  border-bottom: 2px solid #fce4e4;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.report-meta { font-size: 0.75rem; color: #aaa; font-weight: 400; }
+.report-search {
+  width: 100%; padding: 9px 14px; border: 2px solid #ececec;
+  border-radius: 10px; font-size: 0.9rem; outline: none; margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.report-search:focus { border-color: #e74c3c; }
+.table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid #f0f0f0; }
+table {
+  width: 100%; border-collapse: collapse; font-size: 0.82rem;
+}
+th {
+  background: linear-gradient(135deg, #922b21, #c0392b);
+  color: white; padding: 10px 12px; text-align: left;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+td { padding: 9px 12px; border-bottom: 1px solid #f5f5f5; color: #333; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fff8f5; }
+.badge-reg { background: #eafaf1; color: #1e8449; border-radius: 6px; padding: 2px 8px; font-size: 0.73rem; font-weight: 700; }
+.no-rows { text-align: center; color: #aaa; padding: 40px 0; font-size: 0.9rem; }
+.loading-report { text-align: center; color: #aaa; padding: 30px 0; font-size: 0.88rem; }
+
+.hidden { display: none !important; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block; width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,0.35); border-top-color: white;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+.spinner-dark {
+  display: inline-block; width: 15px; height: 15px;
+  border: 2px solid #ddd; border-top-color: #c0392b;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="om">🕉️</div>
+    <h1>HCCC Library — Book Issuance</h1>
+    <p>Hindu Community &amp; Cultural Center</p>
+  </div>
+
+  <!-- ══════════════ FORM SECTION ══════════════ -->
+  <div id="formSection">
+
+    <!-- Progress -->
+    <div class="progress-bar">
+      <div class="step-ind active" id="ind1">
+        <div class="step-circle">1</div>
+        <div class="step-label">Member</div>
+      </div>
+      <div class="step-ind" id="ind2">
+        <div class="step-circle">2</div>
+        <div class="step-label">Book</div>
+      </div>
+      <div class="step-ind" id="ind3">
+        <div class="step-circle">✓</div>
+        <div class="step-label">Done</div>
+      </div>
+    </div>
+
+    <div class="form-body">
+
+      <!-- ══════════════════ STEP 1 ══════════════════ -->
+      <div id="step1">
+        <div class="section-title">👤 Step 1 — Member Verification</div>
+
+        <div class="row">
+          <div class="field">
+            <label>First Name</label>
+            <input type="text" id="firstName" placeholder="Rama" />
+          </div>
+          <div class="field">
+            <label>Middle Name <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional)</span></label>
+            <input type="text" id="middleName" placeholder="Kumar" />
+          </div>
+          <div class="field">
+            <label>Last Name</label>
+            <input type="text" id="lastName" placeholder="Devi" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Email Address <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional)</span></label>
+          <input type="email" id="email" placeholder="member@email.com" />
+        </div>
+
+        <div class="field">
+          <label>Phone Number <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional)</span></label>
+          <input type="tel" id="phone" placeholder="9251234567" />
+        </div>
+
+        <button class="btn btn-primary" id="checkBtn" onclick="checkRegistration()">
+          🔍 Check Temple Database
+        </button>
+
+        <!-- Result -->
+        <div id="result1" class="hidden">
+
+          <div id="boxRegistered" class="status-box registered hidden">
+            <span class="icon">✅</span>
+            <div>
+              <div>Member is Registered</div>
+              <div style="font-weight:400;font-size:0.8rem;margin-top:2px;">Found in Temple Database</div>
+            </div>
+          </div>
+
+          <div id="boxNotReg" class="status-box not-reg hidden">
+            <span class="icon">⚠️</span>
+            <div>
+              <div>Not Registered</div>
+              <div style="font-weight:400;font-size:0.8rem;margin-top:2px;">Member must register at the HCCC office first</div>
+            </div>
+          </div>
+
+          <div id="boxError" class="status-box error hidden">
+            <span class="icon">❌</span>
+            <div id="errorMsg">Could not connect to server</div>
+          </div>
+
+          <!-- Agreement — shown only if registered -->
+          <div id="agreementSection" class="hidden">
+            <div class="agreement-box">
+              <strong>📋 Library Borrowing Agreement</strong><br><br>
+              By proceeding, the member agrees to:
+              <ul>
+                <li>Return all borrowed books within <strong>15 days</strong></li>
+                <li>Borrow only <strong>one book at a time</strong></li>
+                <li>Keep books in good condition</li>
+                <li>Late returns may suspend borrowing privileges</li>
+              </ul>
+              <em style="font-size:0.8rem;color:#888;">This is a blanket agreement covering all future book borrowings.</em>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="agreeChk" onchange="toggleProceed()" />
+              <label for="agreeChk">Member has read and agrees to all terms above</label>
+            </div>
+            <button class="btn btn-primary hidden" id="proceedBtn" onclick="goStep2()" style="margin-top:14px;">
+              Proceed to Book Details →
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══════════════════ STEP 2 ══════════════════ -->
+      <div id="step2" class="hidden">
+        <div class="section-title">📚 Step 2 — Book Details</div>
+
+        <div class="field">
+          <label>Book Title</label>
+          <input type="text" id="bookNameInput" placeholder="Enter book title..." autofocus />
+        </div>
+
+        <div class="field">
+          <label>Author <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional)</span></label>
+          <input type="text" id="bookAuthorInput" placeholder="Enter author name..." />
+        </div>
+
+        <button class="btn btn-success" id="issueBtn" onclick="issueBook()" style="margin-top:10px;">
+          ✅ Issue Book
+        </button>
+
+        <button class="btn btn-secondary" onclick="goStep1()" style="margin-top:10px;">
+          ← Back
+        </button>
+      </div>
+
+      <!-- ══════════════════ STEP 3 ══════════════════ -->
+      <div id="step3" class="hidden">
+        <div class="success-screen">
+          <div class="check">🎉</div>
+          <h2>Book Issued Successfully!</h2>
+          <p id="s3name" style="font-weight:600;color:#333;margin:6px 0;"></p>
+          <p id="s3book" style="color:#777;"></p>
+          <div class="return-badge" id="s3deadline"></div>
+
+          <div class="email-preview" style="margin-top:18px;">
+            <div class="email-label">📧 Email preview (click to open your mail app)</div>
+            <div id="s3email" style="cursor:pointer;" onclick="sendEmail()"></div>
+          </div>
+
+          <button class="btn btn-primary" onclick="resetAll()" style="margin-top:4px;">
+            🔄 Issue Another Book
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════ REPORT SECTION ══════════════ -->
+  <div id="reportView" class="hidden">
+    <div class="report-title">
+      <span>📋 Books Issued — All Records</span>
+      <span class="report-meta" id="reportMeta"></span>
+    </div>
+
+    <input class="report-search" type="text" id="reportSearch" placeholder="🔍 Search by name, book, date..." oninput="filterTable()" />
+
+    <div id="reportLoading" class="loading-report">
+      <span class="spinner-dark"></span> Loading records from Google Sheet...
+    </div>
+
+    <div class="table-wrap hidden" id="reportTableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Member Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Book Title</th>
+            <th>Author</th>
+            <th>Status</th>
+            <th>Return By</th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+      <div id="noRows" class="no-rows hidden">No records found.</div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="toggleReport()" style="margin-top:18px;">
+      ← Back to Form
+    </button>
+  </div>
+
+</div>
+
+<script>
+const SERVER   = window.location.origin;
+const LOAN_DAYS = 15;
+
+let member     = {};
+let book       = {};
+let allRows    = [];   // full report data
+let inReport   = false;
+
+// ── REPORT ────────────────────────────────────────────────────────────────────
+async function toggleReport() {
+  inReport = !inReport;
+  document.getElementById("formSection").classList.toggle("hidden", inReport);
+  document.getElementById("reportView").classList.toggle("hidden", !inReport);
+  document.querySelector(".report-toggle-btn").textContent = inReport ? "✏️ Issue Book" : "📋 View Records";
+
+  if (inReport) await loadReport();
+}
+
+async function loadReport() {
+  document.getElementById("reportLoading").classList.remove("hidden");
+  document.getElementById("reportTableWrap").classList.add("hidden");
+  document.getElementById("reportSearch").value = "";
+
+  try {
+    const res  = await fetch(`${SERVER}/report`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    const rows = data.rows || [];
+    // First row may be header — skip if it looks like one
+    const isHeader = rows.length > 0 && (rows[0][0] || "").toLowerCase().includes("date");
+    allRows = isHeader ? rows.slice(1) : rows;
+
+    document.getElementById("reportMeta").textContent = `${allRows.length} record${allRows.length !== 1 ? "s" : ""}`;
+    renderTable(allRows);
+  } catch (e) {
+    document.getElementById("reportLoading").innerHTML =
+      `<span style="color:#c0392b;">❌ Could not load records: ${e.message}</span>`;
+    return;
+  }
+
+  document.getElementById("reportLoading").classList.add("hidden");
+  document.getElementById("reportTableWrap").classList.remove("hidden");
+}
+
+function renderTable(rows) {
+  const tbody  = document.getElementById("reportBody");
+  const noRows = document.getElementById("noRows");
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    noRows.classList.remove("hidden");
+    return;
+  }
+  noRows.classList.add("hidden");
+
+  // Columns: [Date, FullName, Email, Phone, Title, Author, Status, ReturnDate]
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    const cols = [r[0]||"", r[1]||"", r[2]||"", r[3]||"", r[4]||"", r[5]||"", r[6]||"", r[7]||""];
+    cols.forEach((val, i) => {
+      const td = document.createElement("td");
+      if (i === 6) {  // Status badge
+        td.innerHTML = `<span class="badge-reg">${val || "Registered"}</span>`;
+      } else {
+        td.textContent = val;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function filterTable() {
+  const q = document.getElementById("reportSearch").value.toLowerCase();
+  if (!q) { renderTable(allRows); return; }
+  const filtered = allRows.filter(r => r.join(" ").toLowerCase().includes(q));
+  document.getElementById("reportMeta").textContent = `${filtered.length} of ${allRows.length} record${allRows.length !== 1 ? "s" : ""}`;
+  renderTable(filtered);
+}
+
+// ── STEP 1 ────────────────────────────────────────────────────────────────────
+async function checkRegistration() {
+  const fn = id("firstName").value.trim();
+  const mn = id("middleName").value.trim();
+  const ln = id("lastName").value.trim();
+  const em = id("email").value.trim();
+  const ph = id("phone").value.trim();
+
+  if (!fn || !ln) { alert("Please fill in First Name and Last Name."); return; }
+
+  const btn = id("checkBtn");
+  btn.innerHTML = '<span class="spinner"></span> Checking Temple Database...';
+  btn.disabled = true;
+
+  const fullName = [fn, mn, ln].filter(Boolean).join(" ");
+  member = { firstName: fn, middleName: mn, lastName: ln, fullName, email: em, phone: ph };
+
+  id("result1").classList.remove("hidden");
+  hide("boxRegistered"); hide("boxNotReg"); hide("boxError"); hide("agreementSection");
+
+  try {
+    const res  = await fetch(`${SERVER}/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName: fn, lastName: ln, phone: ph, email: em })
+    });
+    const data = await res.json();
+
+    if (data.registered === 1) {
+      show("boxRegistered");
+      setTimeout(() => goStep2(), 1500);
+    } else {
+      show("boxNotReg");
+    }
+  } catch (e) {
+    show("boxError");
+    id("errorMsg").textContent = "Cannot connect to local server. Is hccc_server.py running?";
+  }
+
+  btn.innerHTML = '🔍 Check Temple Database';
+  btn.disabled = false;
+}
+
+function toggleProceed() {
+  id("proceedBtn").classList.toggle("hidden", !id("agreeChk").checked);
+}
+
+function goStep2() { setStep(2); setTimeout(() => id("bookNameInput").focus(), 100); }
+function goStep1() { setStep(1); }
+
+// ── STEP 2 / 3 ───────────────────────────────────────────────────────────────
+async function issueBook() {
+  const bookName   = id("bookNameInput").value.trim();
+  const bookAuthor = id("bookAuthorInput").value.trim();
+  if (!bookName) { alert("Please enter the book title."); return; }
+
+  const today    = new Date();
+  const returnDt = new Date(today);
+  returnDt.setDate(returnDt.getDate() + LOAN_DAYS);
+  book = { title: bookName, author: bookAuthor, barcode: "", issueDate: fmtDate(today), returnDate: fmtDate(returnDt) };
+
+  const btn = id("issueBtn");
+  btn.innerHTML = '<span class="spinner"></span> Issuing...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${SERVER}/issue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member, book })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "Unknown error");
+
+    id("s3name").textContent     = member.fullName;
+    id("s3book").textContent     = `"${book.title}"${book.author ? " by " + book.author : ""}`;
+    id("s3deadline").textContent = `📅 Return by: ${book.returnDate} (${LOAN_DAYS} days)`;
+    id("s3email").innerHTML      = buildEmail().replace(/\n/g, "<br>");
+
+    setStep(3);
+  } catch (e) {
+    alert("Error issuing book: " + e.message);
+  }
+
+  btn.innerHTML = '✅ Issue Book';
+  btn.disabled = false;
+}
+
+function buildEmail() {
+  return `Dear ${member.fullName},
+
+Your book has been issued from the HCCC Library.
+
+📖 Book Title  : ${book.title}
+✍️  Author      : ${book.author || "—"}
+📅 Issue Date  : ${book.issueDate}
+⏰ Return By   : ${book.returnDate} (${LOAN_DAYS} days)
+
+Please return the book on time to maintain your borrowing privileges.
+
+Thank you,
+HCCC Library Team`;
+}
+
+function sendEmail() {
+  if (!member.email) return;
+  const subject = `HCCC Library — "${book.title}" — Return by ${book.returnDate}`;
+  window.open(`mailto:${member.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildEmail())}`);
+}
+
+function resetAll() {
+  ["firstName","middleName","lastName","email","phone","bookNameInput","bookAuthorInput"]
+    .forEach(f => { const el = id(f); if (el) el.value = ""; });
+  id("result1").classList.add("hidden");
+  id("agreeChk").checked = false;
+  member = {}; book = {};
+  setStep(1);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function id(x)   { return document.getElementById(x); }
+function show(x) { id(x).classList.remove("hidden"); }
+function hide(x) { id(x).classList.add("hidden"); }
+function fmtDate(d) { return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`; }
+
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    id(`step${i}`).classList.toggle("hidden", i !== n);
+    const ind = id(`ind${i}`);
+    ind.classList.remove("active","done");
+    if (i < n)   ind.classList.add("done");
+    if (i === n) ind.classList.add("active");
+  });
+}
+</script>
+</body>
+</html>
