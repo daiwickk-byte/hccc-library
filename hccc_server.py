@@ -253,7 +253,8 @@ class Handler(BaseHTTPRequestHandler):
         member = body.get("member", {})
         book   = body.get("book", {})
 
-        today      = datetime.now()
+        from zoneinfo import ZoneInfo
+        today      = datetime.now(ZoneInfo("America/Los_Angeles"))
         return_by  = today + timedelta(days=LOAN_DAYS)
         date_str   = today.strftime("%Y-%m-%d")
         return_str = return_by.strftime("%Y-%m-%d")
