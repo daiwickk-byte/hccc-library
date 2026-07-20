@@ -29,42 +29,46 @@ TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-EMAIL_FROM     = os.environ.get("EMAIL_FROM", "")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 
 def send_book_email(to_email, member_name, book_title, book_author, issue_date, return_date):
-    if not to_email or not EMAIL_FROM or not EMAIL_PASSWORD:
-        print("  Email skipped — no email address or credentials configured")
+    if not to_email or not RESEND_API_KEY:
+        print("  Email skipped — no email or API key")
         return
-    import smtplib
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    subject = f'HCCC Library — "{book_title}" issued — Return by {return_date}'
+    import urllib.request
     body = f"""Dear {member_name},
 
 Your book has been issued from the HCCC Library.
 
-📖 Book Title  : {book_title}
-✍️  Author      : {book_author or "—"}
-📅 Issue Date  : {issue_date}
-⏰ Return By   : {return_date} (15 days)
+Book Title  : {book_title}
+Author      : {book_author or "—"}
+Issue Date  : {issue_date}
+Return By   : {return_date} (15 days)
 
 Please return the book on time to maintain your borrowing privileges.
 
 Thank you,
 HCCC Library Team
 Hindu Community & Cultural Center, Livermore"""
-    msg = MIMEMultipart()
-    msg["From"]    = EMAIL_FROM
-    msg["To"]      = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    payload = {
+        "from": "HCCC Library <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": f'HCCC Library — "{book_title}" — Return by {return_date}',
+        "text": body
+    }
+    import json as _json
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=_json.dumps(payload).encode(),
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        method="POST"
+    )
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_FROM, EMAIL_PASSWORD)
-            server.send_message(msg)
-        print(f"  Email sent to {to_email} ✅")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"  Email sent to {to_email} ✅ ({resp.status})")
     except Exception as e:
         print(f"  Email error: {e}")
 
@@ -269,15 +273,16 @@ class Handler(BaseHTTPRequestHandler):
             service = get_sheets_service()
             write_to_books_issued(service, row)
             print(f"  Issued: '{book.get('title')}' to {member.get('fullName')} (return by {return_str})")
-            # Send email automatically
-            send_book_email(
+            # Send email in background so form doesn't slow down
+            import threading
+            threading.Thread(target=send_book_email, args=(
                 member.get("email", ""),
                 member.get("fullName", ""),
                 book.get("title", ""),
                 book.get("author", ""),
                 date_str,
                 return_str
-            )
+            ), daemon=True).start()
             self.send_json({"success": True, "returnDate": return_str})
         except Exception as e:
             print(f"  Error writing to sheet: {e}")
