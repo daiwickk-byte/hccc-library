@@ -67,8 +67,15 @@ def get_sheets_service():
     sa_json = os.environ.get("SERVICE_ACCOUNT_JSON")
     if sa_json:
         import json as _json
+        import base64
         from google.oauth2.service_account import Credentials
-        sa_info = _json.loads(sa_json)
+        try:
+            # Try base64 decode first
+            decoded = base64.b64decode(sa_json).decode("utf-8")
+            sa_info = _json.loads(decoded)
+        except Exception:
+            # Fall back to raw JSON
+            sa_info = _json.loads(sa_json)
         creds = Credentials.from_service_account_info(sa_info, scopes=SCOPES)
         return build("sheets", "v4", credentials=creds)
 
