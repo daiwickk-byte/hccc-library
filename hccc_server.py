@@ -29,6 +29,45 @@ TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+EMAIL_FROM     = os.environ.get("EMAIL_FROM", "")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+
+def send_book_email(to_email, member_name, book_title, book_author, issue_date, return_date):
+    if not to_email or not EMAIL_FROM or not EMAIL_PASSWORD:
+        print("  Email skipped — no email address or credentials configured")
+        return
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    subject = f'HCCC Library — "{book_title}" issued — Return by {return_date}'
+    body = f"""Dear {member_name},
+
+Your book has been issued from the HCCC Library.
+
+📖 Book Title  : {book_title}
+✍️  Author      : {book_author or "—"}
+📅 Issue Date  : {issue_date}
+⏰ Return By   : {return_date} (15 days)
+
+Please return the book on time to maintain your borrowing privileges.
+
+Thank you,
+HCCC Library Team
+Hindu Community & Cultural Center, Livermore"""
+    msg = MIMEMultipart()
+    msg["From"]    = EMAIL_FROM
+    msg["To"]      = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(EMAIL_FROM, EMAIL_PASSWORD)
+            server.send_message(msg)
+        print(f"  Email sent to {to_email} ✅")
+    except Exception as e:
+        print(f"  Email error: {e}")
+
 def check_devotee_registered(firstname, lastname, email="", phone=""):
     """Call the HCCC temple API to check if devotee is registered."""
     import requests
@@ -230,6 +269,15 @@ class Handler(BaseHTTPRequestHandler):
             service = get_sheets_service()
             write_to_books_issued(service, row)
             print(f"  Issued: '{book.get('title')}' to {member.get('fullName')} (return by {return_str})")
+            # Send email automatically
+            send_book_email(
+                member.get("email", ""),
+                member.get("fullName", ""),
+                book.get("title", ""),
+                book.get("author", ""),
+                date_str,
+                return_str
+            )
             self.send_json({"success": True, "returnDate": return_str})
         except Exception as e:
             print(f"  Error writing to sheet: {e}")
