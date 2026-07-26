@@ -323,7 +323,7 @@ tr:hover td { background: #fff8f5; }
 
       <!-- ══════════════════ STEP 2 ══════════════════ -->
       <div id="step2" class="hidden">
-        <div class="section-title">📚 Step 2 — Book Details</div>
+        <div class="section-title">📚 Step 2 — Book Details & Terms</div>
 
         <div class="field">
           <label>Book Title</label>
@@ -335,7 +335,31 @@ tr:hover td { background: #fff8f5; }
           <input type="text" id="bookAuthorInput" placeholder="Enter author name..." />
         </div>
 
-        <button class="btn btn-success" id="issueBtn" onclick="issueBook()" style="margin-top:10px;">
+        <div class="field">
+          <label>Book Barcode <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional - scan here)</span></label>
+          <input type="text" id="barcodeInput" placeholder="Scan book barcode here" />
+        </div>
+
+        <div class="agreement-box" style="margin-top:14px;">
+          <strong>📋 HCCC Lending Library Terms & Conditions</strong><br><br>
+          <ul style="font-size:0.82rem;">
+            <li>Members may borrow <strong>1 book at a time</strong> for <strong>2 weeks</strong></li>
+            <li>Books must be returned on or before the due date</li>
+            <li>Books must be returned in the same condition as issued</li>
+            <li>Protect books from damage, moisture, and writing marks</li>
+            <li>If lost, stolen, or damaged: pay full replacement cost</li>
+            <li>Repeated late returns will suspend borrowing privileges</li>
+            <li>Silence must be maintained in the library</li>
+            <li>Mobile phones on silent, no eating/drinking/smoking</li>
+          </ul>
+        </div>
+
+        <div class="checkbox-row">
+          <input type="checkbox" id="termsChk" onchange="toggleIssueBtn()" />
+          <label for="termsChk">I agree to all HCCC Lending Library Terms & Conditions</label>
+        </div>
+
+        <button class="btn btn-success hidden" id="issueBtn" onclick="issueBook()" style="margin-top:10px;">
           ✅ Issue Book
         </button>
 
@@ -535,19 +559,29 @@ function toggleProceed() {
   id("proceedBtn").classList.toggle("hidden", !id("agreeChk").checked);
 }
 
-function goStep2() { setStep(2); setTimeout(() => id("bookNameInput").focus(), 100); }
+function toggleIssueBtn() {
+  id("issueBtn").classList.toggle("hidden", !id("termsChk").checked);
+}
+
+function goStep2() {
+  setStep(2);
+  id("termsChk").checked = false;
+  id("issueBtn").classList.add("hidden");
+  setTimeout(() => id("bookNameInput").focus(), 100);
+}
 function goStep1() { setStep(1); }
 
 // ── STEP 2 / 3 ───────────────────────────────────────────────────────────────
 async function issueBook() {
   const bookName   = id("bookNameInput").value.trim();
   const bookAuthor = id("bookAuthorInput").value.trim();
+  const barcode    = id("barcodeInput").value.trim();
   if (!bookName) { alert("Please enter the book title."); return; }
 
   const today    = new Date();
   const returnDt = new Date(today);
   returnDt.setDate(returnDt.getDate() + LOAN_DAYS);
-  book = { title: bookName, author: bookAuthor, barcode: "", issueDate: fmtDate(today), returnDate: fmtDate(returnDt) };
+  book = { title: bookName, author: bookAuthor, barcode: barcode, issueDate: fmtDate(today), returnDate: fmtDate(returnDt) };
 
   const btn = id("issueBtn");
   btn.innerHTML = '<span class="spinner"></span> Issuing...';
@@ -599,10 +633,11 @@ function sendEmail() {
 }
 
 function resetAll() {
-  ["firstName","middleName","lastName","email","phone","bookNameInput","bookAuthorInput"]
+  ["firstName","middleName","lastName","email","phone","bookNameInput","bookAuthorInput","barcodeInput"]
     .forEach(f => { const el = id(f); if (el) el.value = ""; });
   id("result1").classList.add("hidden");
   id("agreeChk").checked = false;
+  id("termsChk").checked = false;
   member = {}; book = {};
   setStep(1);
 }
