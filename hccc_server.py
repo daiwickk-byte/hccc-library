@@ -162,6 +162,27 @@ def read_books_issued(service):
     ).execute()
     return result.get("values", [])
 
+def lookup_book_by_barcode(service, barcode):
+    """Search Book Inventory tab for a barcode and return title + author."""
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SHEET_ID,
+            range="'Book Inventory'!A:C"
+        ).execute()
+        rows = result.get("values", [])
+
+        for row in rows:
+            if len(row) > 0 and row[0].strip() == barcode.strip():
+                # Found! Return [title, author]
+                title  = row[1] if len(row) > 1 else ""
+                author = row[2] if len(row) > 2 else ""
+                return {"title": title, "author": author, "found": True}
+
+        return {"found": False}
+    except Exception as e:
+        print(f"  Barcode lookup error: {e}")
+        return {"found": False, "error": str(e)}
+
 # ─── Request Handler ──────────────────────────────────────────────────────────
 class Handler(BaseHTTPRequestHandler):
 
@@ -214,6 +235,8 @@ class Handler(BaseHTTPRequestHandler):
             self.handle_check(body)
         elif parsed.path == "/issue":
             self.handle_issue(body)
+        elif parsed.path == "/lookup-barcode":
+            self.handle_lookup_barcode(body)
         else:
             self.send_json({"error": "Not found"}, 404)
 
@@ -247,6 +270,20 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"  Error: {e}")
             self.send_json({"registered": 0, "message": f"Server error: {str(e)}"})
+
+    # POST /lookup-barcode — { barcode: "..." }
+    def handle_lookup_barcode(self, body):
+        barcode = body.get("barcode", "").strip()
+        if not barcode:
+            self.send_json({"found": False, "error": "No barcode provided"})
+            return
+        try:
+            service = get_sheets_service()
+            result = lookup_book_by_barcode(service, barcode)
+            self.send_json(result)
+        except Exception as e:
+            print(f"  Lookup error: {e}")
+            self.send_json({"found": False, "error": str(e)})
 
     # POST /issue — { member: {...}, book: {...} }
     def handle_issue(self, body):
