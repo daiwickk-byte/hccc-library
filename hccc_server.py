@@ -266,6 +266,7 @@ class Handler(BaseHTTPRequestHandler):
             member.get("phone", ""),
             book.get("title", ""),
             book.get("author", ""),
+            book.get("barcode", ""),
             "Registered",
             return_str,
         ]
