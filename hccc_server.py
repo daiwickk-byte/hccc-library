@@ -25,12 +25,13 @@ LOAN_DAYS           = 15
 # Temple Devotee API
 TEMPLE_API_URL  = "https://livermoretemple.org:9003/devotee-management/devotees/existence/public"
 TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
+
+# Gmail SMTP Configuration
+GMAIL_FROM_EMAIL = os.environ.get("GMAIL_FROM_EMAIL", "")
+GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "")
 # ──────────────────────────────────────────────────────────────────────────────
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-GMAIL_FROM_EMAIL = os.environ.get("GMAIL_FROM_EMAIL", "daiwickk@gmail.com")
-GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "")
 
 def send_book_email(to_email, member_name, book_title, book_author, issue_date, return_date):
     """Send book issuance email via Gmail SMTP."""
@@ -38,8 +39,8 @@ def send_book_email(to_email, member_name, book_title, book_author, issue_date, 
         print("  Email skipped — no email provided")
         return
 
-    if not GMAIL_PASSWORD:
-        print("  Email skipped — Gmail password not configured (set GMAIL_PASSWORD env var)")
+    if not GMAIL_PASSWORD or not GMAIL_FROM_EMAIL:
+        print("  Email skipped — Gmail credentials not configured")
         return
 
     import smtplib
@@ -47,7 +48,6 @@ def send_book_email(to_email, member_name, book_title, book_author, issue_date, 
     from email.mime.multipart import MIMEMultipart
 
     try:
-        # Compose email
         subject = f'Book Issued: "{book_title}" — Return by {return_date}'
         body = f"""Dear {member_name},
 
@@ -64,7 +64,6 @@ Thank you,
 HCCC Library Team
 Hindu Community & Cultural Center, Livermore"""
 
-        # Send via Gmail SMTP
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(GMAIL_FROM_EMAIL, GMAIL_PASSWORD)
@@ -78,9 +77,9 @@ Hindu Community & Cultural Center, Livermore"""
         server.send_message(msg)
         server.quit()
 
-        print(f"  ✅ Email sent to {to_email}")
+        print(f"  ✅ Email sent to {to_email} from {GMAIL_FROM_EMAIL}")
     except Exception as e:
-        print(f"  ❌ Email error: {e}")
+        print(f"  ❌ Email error: {type(e).__name__}: {e}")
 
 def check_devotee_registered(firstname, lastname, email="", phone=""):
     """Call the HCCC temple API to check if devotee is registered."""
@@ -322,6 +321,7 @@ class Handler(BaseHTTPRequestHandler):
             service = get_sheets_service()
             write_to_books_issued(service, row)
             print(f"  Issued: '{book.get('title')}' to {member.get('fullName')} (return by {return_str})")
+
             # Send email in background so form doesn't slow down
             import threading
             threading.Thread(target=send_book_email, args=(
@@ -332,6 +332,7 @@ class Handler(BaseHTTPRequestHandler):
                 date_str,
                 return_str
             ), daemon=True).start()
+
             self.send_json({"success": True, "returnDate": return_str})
         except Exception as e:
             print(f"  Error writing to sheet: {e}")
