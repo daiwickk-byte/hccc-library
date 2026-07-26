@@ -336,8 +336,9 @@ tr:hover td { background: #fff8f5; }
         </div>
 
         <div class="field">
-          <label>Book Barcode <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional - scan here)</span></label>
-          <input type="text" id="barcodeInput" placeholder="Scan book barcode here" />
+          <label>Book Barcode <span style="font-weight:400;color:#bbb;text-transform:none;font-size:0.75rem;">(optional - scan or enter ISBN)</span></label>
+          <input type="text" id="barcodeInput" placeholder="Scan book barcode here" onblur="lookupBookByBarcode()" />
+          <div id="barcodeStatus" style="font-size:0.75rem;color:#999;margin-top:4px;"></div>
         </div>
 
         <div class="agreement-box" style="margin-top:14px;">
@@ -561,6 +562,39 @@ function toggleProceed() {
 
 function toggleIssueBtn() {
   id("issueBtn").classList.toggle("hidden", !id("termsChk").checked);
+}
+
+async function lookupBookByBarcode() {
+  const barcode = id("barcodeInput").value.trim();
+  const status = id("barcodeStatus");
+
+  if (!barcode || barcode.length < 10) {
+    status.textContent = "";
+    return;
+  }
+
+  status.textContent = "🔍 Looking up...";
+
+  try {
+    const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${barcode}&jscmd=data&format=json`);
+    const data = await res.json();
+    const key = Object.keys(data)[0];
+
+    if (key && data[key]) {
+      const book = data[key];
+      id("bookNameInput").value = book.title || "";
+      const author = book.authors && book.authors[0] ? book.authors[0].name : "";
+      id("bookAuthorInput").value = author || "";
+      status.textContent = "✅ Book found!";
+      setTimeout(() => { status.textContent = ""; }, 2000);
+    } else {
+      status.textContent = "⚠️ Book not found. Enter manually.";
+      setTimeout(() => { status.textContent = ""; }, 3000);
+    }
+  } catch (e) {
+    status.textContent = "❌ Lookup failed. Enter manually.";
+    console.error(e);
+  }
 }
 
 function goStep2() {
