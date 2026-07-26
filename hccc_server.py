@@ -323,15 +323,6 @@ class Handler(BaseHTTPRequestHandler):
             write_to_books_issued(service, row)
             print(f"  Issued: '{book.get('title')}' to {member.get('fullName')} (return by {return_str})")
             # Send email in background so form doesn't slow down
-            import threading
-            threading.Thread(target=send_book_email, args=(
-                member.get("email", ""),
-                member.get("fullName", ""),
-                book.get("title", ""),
-                book.get("author", ""),
-                date_str,
-                return_str
-            ), daemon=True).start()
             self.send_json({"success": True, "returnDate": return_str})
         except Exception as e:
             print(f"  Error writing to sheet: {e}")
