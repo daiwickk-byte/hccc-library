@@ -29,23 +29,34 @@ TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
-SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@hccc-library.com")
+GMAIL_FROM_EMAIL = os.environ.get("GMAIL_FROM_EMAIL", "daiwickk@gmail.com")
+GMAIL_PASSWORD = os.environ.get("GMAIL_PASSWORD", "")
 
 def send_book_email(to_email, member_name, book_title, book_author, issue_date, return_date):
-    if not to_email or not SENDGRID_API_KEY:
-        print("  Email skipped — no email or API key configured")
+    """Send book issuance email via Gmail SMTP."""
+    if not to_email:
+        print("  Email skipped — no email provided")
         return
-    import urllib.request
 
-    body = f"""Dear {member_name},
+    if not GMAIL_PASSWORD:
+        print("  Email skipped — Gmail password not configured (set GMAIL_PASSWORD env var)")
+        return
+
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    try:
+        # Compose email
+        subject = f'Book Issued: "{book_title}" — Return by {return_date}'
+        body = f"""Dear {member_name},
 
 Your book has been issued from the HCCC Library.
 
-Book Title  : {book_title}
-Author      : {book_author or "—"}
-Issue Date  : {issue_date}
-Return By   : {return_date} (15 days)
+📖 Book Title  : {book_title}
+✍️  Author      : {book_author or "Unknown"}
+📅 Issue Date  : {issue_date}
+⏰ Return By   : {return_date}
 
 Please return the book on time to maintain your borrowing privileges.
 
@@ -53,31 +64,23 @@ Thank you,
 HCCC Library Team
 Hindu Community & Cultural Center, Livermore"""
 
-    payload = {
-        "personalizations": [{"to": [{"email": to_email}]}],
-        "from": {"email": SENDGRID_FROM_EMAIL, "name": "HCCC Library"},
-        "subject": f'Book Issued: "{book_title}" — Return by {return_date}',
-        "content": [{"type": "text/plain", "value": body}]
-    }
+        # Send via Gmail SMTP
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(GMAIL_FROM_EMAIL, GMAIL_PASSWORD)
 
-    import json as _json
-    req = urllib.request.Request(
-        "https://api.sendgrid.com/v3/mail/send",
-        data=_json.dumps(payload).encode(),
-        headers={
-            "Authorization": f"Bearer {SENDGRID_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status == 202:
-                print(f"  Email sent to {to_email} ✅")
-            else:
-                print(f"  Email status: {resp.status}")
+        msg = MIMEMultipart()
+        msg["From"] = GMAIL_FROM_EMAIL
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        server.send_message(msg)
+        server.quit()
+
+        print(f"  ✅ Email sent to {to_email}")
     except Exception as e:
-        print(f"  Email error: {e}")
+        print(f"  ❌ Email error: {e}")
 
 def check_devotee_registered(firstname, lastname, email="", phone=""):
     """Call the HCCC temple API to check if devotee is registered."""
