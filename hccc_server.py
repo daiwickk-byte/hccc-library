@@ -29,13 +29,15 @@ TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+SENDGRID_FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "noreply@hccc-library.com")
 
 def send_book_email(to_email, member_name, book_title, book_author, issue_date, return_date):
-    if not to_email or not RESEND_API_KEY:
-        print("  Email skipped — no email or API key")
+    if not to_email or not SENDGRID_API_KEY:
+        print("  Email skipped — no email or API key configured")
         return
     import urllib.request
+
     body = f"""Dear {member_name},
 
 Your book has been issued from the HCCC Library.
@@ -50,25 +52,30 @@ Please return the book on time to maintain your borrowing privileges.
 Thank you,
 HCCC Library Team
 Hindu Community & Cultural Center, Livermore"""
+
     payload = {
-        "from": "HCCC Library <onboarding@resend.dev>",
-        "to": [to_email],
-        "subject": f'HCCC Library — "{book_title}" — Return by {return_date}',
-        "text": body
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": SENDGRID_FROM_EMAIL, "name": "HCCC Library"},
+        "subject": f'Book Issued: "{book_title}" — Return by {return_date}',
+        "content": [{"type": "text/plain", "value": body}]
     }
+
     import json as _json
     req = urllib.request.Request(
-        "https://api.resend.com/emails",
+        "https://api.sendgrid.com/v3/mail/send",
         data=_json.dumps(payload).encode(),
         headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
             "Content-Type": "application/json"
         },
         method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            print(f"  Email sent to {to_email} ✅ ({resp.status})")
+            if resp.status == 202:
+                print(f"  Email sent to {to_email} ✅")
+            else:
+                print(f"  Email status: {resp.status}")
     except Exception as e:
         print(f"  Email error: {e}")
 
