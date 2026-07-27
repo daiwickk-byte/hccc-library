@@ -4,16 +4,16 @@ HCCC Library Local Server
 Runs on http://localhost:5000  (or PORT env var for cloud hosting)
 Handles registration checks and book issuance from the HTML form.
 Uses Zapier webhook for email sending (no SMTP needed).
- 
+
 Run: python hccc_server.py
 """
- 
+
 import json
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from datetime import datetime, timedelta
- 
+
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
 SHEET_ID            = "1Tk8k8W4zTch4JL60cdplrAPOGN3GwDzKMttf1tV4QxU"
 BOOKS_ISSUED_TAB    = "Books Issued"
@@ -22,25 +22,25 @@ SERVICE_ACCOUNT_FILE = "service_account.json"    # Service account (cloud/Railwa
 TOKEN_FILE          = "token.json"
 PORT                = int(os.environ.get("PORT", 5000))
 LOAN_DAYS           = 15
- 
+
 # Temple Devotee API
 TEMPLE_API_URL  = "https://livermoretemple.org:9003/devotee-management/devotees/existence/public"
 TEMPLE_API_KEY  = "UyN9Dema5gR5DQ5fY2hc4bC5Zg8we6cN"
- 
+
 # Zapier Webhook for Email
 ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/28367940/44lal1k/"
 # ──────────────────────────────────────────────────────────────────────────────
- 
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
- 
+
 def send_book_email_via_zapier(to_email, member_name, book_title, book_author, issue_date, return_date):
     """Send book issuance email via Zapier webhook."""
     if not to_email:
         print("  Email skipped — no email provided")
         return
- 
+
     import urllib.request
- 
+
     try:
         payload = {
             "email": to_email,
@@ -50,14 +50,14 @@ def send_book_email_via_zapier(to_email, member_name, book_title, book_author, i
             "issue_date": issue_date,
             "return_date": return_date,
         }
- 
+
         req = urllib.request.Request(
             ZAPIER_WEBHOOK_URL,
             data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json"},
             method="POST"
         )
- 
+
         with urllib.request.urlopen(req, timeout=10) as resp:
             if resp.status in [200, 201, 202]:
                 print(f"  ✅ Email queued to {to_email} via Zapier")
@@ -65,7 +65,7 @@ def send_book_email_via_zapier(to_email, member_name, book_title, book_author, i
                 print(f"  ⚠️  Zapier response: {resp.status}")
     except Exception as e:
         print(f"  ❌ Zapier webhook error: {e}")
- 
+
 def check_devotee_registered(firstname, lastname, email="", phone=""):
     """Call the HCCC temple API to check if devotee is registered."""
     import requests
@@ -74,7 +74,7 @@ def check_devotee_registered(firstname, lastname, email="", phone=""):
     if lastname:  params["lastName"]    = lastname
     if email:     params["email"]       = email
     if phone:     params["phoneNumber"] = phone
- 
+
     try:
         resp = requests.get(
             TEMPLE_API_URL,
@@ -92,14 +92,14 @@ def check_devotee_registered(firstname, lastname, email="", phone=""):
     except Exception as e:
         print(f"  Temple API error: {e}")
         return False
- 
+
 def get_sheets_service():
     """Authenticate with Google Sheets.
     Uses service_account.json if present (cloud/Railway),
     otherwise falls back to OAuth token.json (local)."""
     from googleapiclient.discovery import build
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
- 
+
     # ── Service Account from environment variable (Railway/cloud) ──
     sa_json = os.environ.get("SERVICE_ACCOUNT_JSON")
     if sa_json:
@@ -113,18 +113,18 @@ def get_sheets_service():
             sa_info = _json.loads(sa_json)
         creds = Credentials.from_service_account_info(sa_info, scopes=SCOPES)
         return build("sheets", "v4", credentials=creds)
- 
+
     # ── Service Account from file ──
     if os.path.exists(SERVICE_ACCOUNT_FILE):
         from google.oauth2.service_account import Credentials
         creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         return build("sheets", "v4", credentials=creds)
- 
+
     # ── OAuth (local laptop) ──
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
- 
+
     creds = None
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
@@ -137,7 +137,7 @@ def get_sheets_service():
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
     return build("sheets", "v4", credentials=creds)
- 
+
 def write_to_books_issued(service, row_data):
     service.spreadsheets().values().append(
         spreadsheetId=SHEET_ID,
@@ -146,14 +146,14 @@ def write_to_books_issued(service, row_data):
         insertDataOption="INSERT_ROWS",
         body={"values": [row_data]}
     ).execute()
- 
+
 def read_books_issued(service):
     result = service.spreadsheets().values().get(
         spreadsheetId=SHEET_ID,
         range=f"'{BOOKS_ISSUED_TAB}'!A:J"
     ).execute()
     return result.get("values", [])
- 
+
 def lookup_book_by_barcode(service, barcode):
     """Search Book Inventory tab for a barcode and return title + author."""
     try:
@@ -162,24 +162,24 @@ def lookup_book_by_barcode(service, barcode):
             range="'Book Inventory'!A:C"
         ).execute()
         rows = result.get("values", [])
- 
+
         for row in rows:
             if len(row) > 0 and row[0].strip() == barcode.strip():
                 title  = row[1] if len(row) > 1 else ""
                 author = row[2] if len(row) > 2 else ""
                 return {"title": title, "author": author, "found": True}
- 
+
         return {"found": False}
     except Exception as e:
         print(f"  Barcode lookup error: {e}")
         return {"found": False, "error": str(e)}
- 
+
 # ─── Request Handler ──────────────────────────────────────────────────────────
 class Handler(BaseHTTPRequestHandler):
- 
+
     def log_message(self, format, *args):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {format % args}")
- 
+
     def send_json(self, data, status=200):
         body = json.dumps(data).encode()
         self.send_response(status)
@@ -190,18 +190,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
- 
+
     def do_OPTIONS(self):
         self.send_json({})
- 
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/health":
             self.send_json({"status": "running"})
- 
+
         elif parsed.path == "/report":
             self.handle_report()
- 
+
         elif parsed.path in ("/", "/form"):
             html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hccc_library_form.html")
             try:
@@ -216,12 +216,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Form file not found"}, 404)
         else:
             self.send_json({"error": "Not found"}, 404)
- 
+
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         body   = json.loads(self.rfile.read(length)) if length else {}
         parsed = urlparse(self.path)
- 
+
         if parsed.path == "/check":
             self.handle_check(body)
         elif parsed.path == "/issue":
@@ -230,7 +230,7 @@ class Handler(BaseHTTPRequestHandler):
             self.handle_lookup_barcode(body)
         else:
             self.send_json({"error": "Not found"}, 404)
- 
+
     def handle_report(self):
         try:
             service = get_sheets_service()
@@ -239,13 +239,13 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"  Error reading sheet: {e}")
             self.send_json({"success": False, "error": str(e)}, 500)
- 
+
     def handle_check(self, body):
         firstname = body.get("firstName", "").strip()
         lastname  = body.get("lastName", "").strip()
         phone     = body.get("phone", "").strip()
         email     = body.get("email", "").strip()
- 
+
         if not firstname and not lastname:
             self.send_json({"registered": 0, "message": "First name and last name are required"})
             return
@@ -259,7 +259,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"  Error: {e}")
             self.send_json({"registered": 0, "message": f"Server error: {str(e)}"})
- 
+
     def handle_lookup_barcode(self, body):
         barcode = body.get("barcode", "").strip()
         if not barcode:
@@ -272,17 +272,17 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"  Lookup error: {e}")
             self.send_json({"found": False, "error": str(e)})
- 
+
     def handle_issue(self, body):
         member = body.get("member", {})
         book   = body.get("book", {})
- 
+
         from zoneinfo import ZoneInfo
         today      = datetime.now(ZoneInfo("America/Los_Angeles"))
         return_by  = today + timedelta(days=LOAN_DAYS)
         date_str   = today.strftime("%Y-%m-%d")
         return_str = return_by.strftime("%Y-%m-%d")
- 
+
         row = [
             date_str,
             member.get("fullName", ""),
@@ -294,12 +294,12 @@ class Handler(BaseHTTPRequestHandler):
             "Registered",
             return_str,
         ]
- 
+
         try:
             service = get_sheets_service()
             write_to_books_issued(service, row)
             print(f"  Issued: '{book.get('title')}' to {member.get('fullName')} (return by {return_str})")
- 
+
             # Send email via Zapier webhook in background
             import threading
             threading.Thread(target=send_book_email_via_zapier, args=(
@@ -310,12 +310,12 @@ class Handler(BaseHTTPRequestHandler):
                 date_str,
                 return_str
             ), daemon=True).start()
- 
+
             self.send_json({"success": True, "returnDate": return_str})
         except Exception as e:
             print(f"  Error writing to sheet: {e}")
             self.send_json({"success": False, "error": str(e)}, 500)
- 
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import socket
